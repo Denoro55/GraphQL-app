@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <style>
+        .done {
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+<body>
+<div id="app" v-cloak>
+    <v-app>
+        <nav class="nav">
+            <v-toolbar
+                    extension-height="100"
+                    dark
+                    src="https://cdn.vuetifyjs.com/images/backgrounds/vbanner.jpg"
+            >
+                <v-app-bar-nav-icon></v-app-bar-nav-icon>
+
+                <v-toolbar-title>Vuetify</v-toolbar-title>
+
+                <v-spacer></v-spacer>
+
+                <v-btn icon>
+                    <v-icon>mdi-export</v-icon>
+                </v-btn>
+            </v-toolbar>
+        </nav>
+        <v-container class="pt-10 pb-10">
+            <v-layout row justify-center>
+                <v-flex lg6 md10 xs12>
+                    <v-card>
+                        <v-list two-line subheader>
+                            <v-container class="pa-6">
+                                <v-subheader class="headline">
+                                    {{new Date() | date}}
+                                </v-subheader>
+                                <v-spacer></v-spacer>
+
+                                <p class="text-right"><b>{{todos.length}}</b> Задач</p>
+
+                                <v-flex xs12>
+                                    <v-text-field
+                                            clearable
+                                            v-model="todoTitle"
+                                            id="newTodo"
+                                            name="newTodo"
+                                            label="Введите название задачи"
+                                            @keyup.enter="addTodo"
+                                    >
+                                    </v-text-field>
+                                </v-flex>
+                            </v-container>
+                            <v-subheader class="subheading px-6" v-if="todos.length === 0">
+                                У вас 0 задач, добавьте новую
+                            </v-subheader>
+                            <v-subheader class="subheading" v-else>
+                                Ваши задачи
+                            </v-subheader>
+                            <div v-for="(todo, i) in todos" :key="i">
+                                <v-list-item>
+                                    <v-list-item-action>
+                                        <v-checkbox
+                                                v-model="todo.done"
+                                                @change="changeTodo(todo.id, todo.done)"
+                                        ></v-checkbox>
+                                    </v-list-item-action>
+                                    <v-list-item-content>
+                                        <v-list-item-title class="mb-2" :class="{done: todo.done}">
+                                            {{todo.title | capitalize}}
+                                        </v-list-item-title>
+                                        <v-list-item-subtitle>
+                                            Добавлено в: {{todo.createdAt | date(true) }}
+                                            (Изменено в: {{todo.updatedAt | date(true) }})
+                                        </v-list-item-subtitle>
+                                    </v-list-item-content>
+                                    <v-btn icon ripple color="red" @click="removeTodo(todo.id)">
+                                        <v-icon>close</v-icon>
+                                    </v-btn>
+                                </v-list-item>
+                            </div>
+                        </v-list>
+                    </v-card>
+                </v-flex>
+            </v-layout>
+        </v-container>
+    </v-app>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                isDark: true,
+                show: true,
+                todoTitle: '',
+                todos: []
+            }
+        },
+        created() {
+            fetch('/api/todo', {
+                method: 'get'
+            })
+                .then(res => res.json())
+                .then(todos => {
+                    this.todos = todos;
+                })
+                .catch(e => console.log(e))
+        },
+        methods: {
+            addTodo() {
+                const title = this.todoTitle.trim();
+                if (!title) {
+                    return
+                }
+                // this.todos.push({
+                //     title: title,
+                //     id: Math.random(),
+                //     done: false,
+                //     date: new Date()
+                // });
+
+                fetch('/api/todo', {
+                    method: 'post',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        title
+                    })
+                }).then(res => res.json())
+                    .then(({todo}) => {
+                        console.log(todo);
+                        this.todos.push(todo);
+                    });
+
+                this.todoTitle = ''
+            },
+            removeTodo(id) {
+                this.todos = this.todos.filter(t => t.id !== id);
+                fetch('/api/todo/' + id, {
+                    method: 'delete'
+                }).then(res => res.json())
+                    .then(({todo}) => {
+                    })
+                    .catch(e => {
+                        console.log(e);
+                    })
+            },
+            changeTodo(id, done) {
+                fetch('/api/todo/' + id, {
+                    method: 'put',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        done
+                    })
+                }).then(res => res.json())
+                    .then(({todo}) => {
+                        const idx = this.todos.findIndex(t => t.id === todo.id);
+                        this.todos[idx].updatedAt = todo.updatedAt;
+                    })
+                    .catch(e => {
+                        console.log(e);
+                    })
+            }
+        },
+        filters: {
+            capitalize(value) {
+                return value.toString().charAt(0).toUpperCase() + value.slice(1)
+            },
+            date(value, withTime) {
+                const options = {
+                    year: 'numeric',
+                    month: 'long',
+                    day: '2-digit'
+                };
+
+                if (withTime) {
+                    options.hour = '2-digit';
+                    options.minute = '2-digit';
+                    options.second = '2-digit';
+                }
+
+                return new Intl.DateTimeFormat('ru-RU', options).format(new Date(value))
+            }
+        },
+        vuetify: new Vuetify(),
+    })
+</script>
+<script src="/app.js"></script>
+</body>
+</html>
